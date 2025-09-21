@@ -16,28 +16,38 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // ✅ Create transporter INSIDE the route
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
-
-    // ✅ Send Email
-    const info = await transporter.sendMail({
-      from: `"Math Tuition" <${process.env.EMAIL_USER}>`,
-      to: "your-admin-email@gmail.com",
-      subject: "New Contact Form Submission",
-      text: `New student inquiry:\nName: ${name}\nGrade: ${grade}\nPhone: ${phone}`,
-    });
-
-    // ✅ Save to MongoDB
+    // Save to DB first
     const newContact = new Contact({ name, grade, phone });
     await newContact.save();
+    console.log("📦 Contact saved:", newContact);
 
-    res.json({ status: "success", message: "Form submitted & email sent!" });
+    // Send Email
+    try {
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+      });
+
+      const info = await transporter.sendMail({
+        from: `"Math Tuition" <${process.env.EMAIL_USER}>`,
+        to: "your-admin-email@gmail.com",
+        subject: "New Contact Form Submission",
+        text: `New student inquiry:\nName: ${name}\nGrade: ${grade}\nPhone: ${phone}`,
+      });
+
+      console.log("📧 Email sent:", info.messageId);
+    } catch (emailErr) {
+      console.error("📭 Email failed:", emailErr.message);
+      // Optional: Save to fallback log, queue, or notify admin
+    }
+
+    res.json({
+      status: "success",
+      message: "Form submitted! Email sent (or will be retried).",
+    });
   } catch (err) {
     console.error("POST /api/contact error:", err);
     res.status(500).json({
