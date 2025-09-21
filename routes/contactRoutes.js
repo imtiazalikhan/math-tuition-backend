@@ -1,7 +1,17 @@
 import express from "express";
 import Contact from "../models/Contact.js";
+import nodemailer from "nodemailer";
 
 const router = express.Router();
+
+// Setup transporter (example with Gmail – replace with your email & app password)
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER, // your email
+    pass: process.env.EMAIL_PASS, // app password (not your main password)
+  },
+});
 
 // POST - Save contact form
 router.post("/", async (req, res) => {
@@ -12,9 +22,20 @@ router.post("/", async (req, res) => {
         .status(400)
         .json({ status: "error", message: "All fields required" });
     }
+
+    // Save to DB
     const newContact = new Contact({ name, grade, phone });
     await newContact.save();
-    res.json({ status: "success", message: "Form submitted!" });
+
+    // Send Email
+    await transporter.sendMail({
+      from: `"Math Tuition" <${process.env.EMAIL_USER}>`,
+      to: "your-admin-email@gmail.com",
+      subject: "New Contact Form Submission",
+      text: `New student inquiry:\nName: ${name}\nGrade: ${grade}\nPhone: ${phone}`,
+    });
+
+    res.json({ status: "success", message: "Form submitted & email sent!" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ status: "error", message: "Server error" });
